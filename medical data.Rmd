@@ -1,0 +1,6 @@
+---
+title: "medical data"
+author: "YOON HEO"
+date: '2020 2 16 '
+output: html_document
+---
