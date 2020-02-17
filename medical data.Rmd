@@ -4,3 +4,436 @@ author: "YOON HEO"
 date: '2020 2 16 '
 output: html_document
 ---
+
+
+## library
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(readxl)
+library(corrplot)
+library(ggplot2)
+library(MASS)
+library(caret)
+library(grid)
+library(gridExtra)
+library(data.table)
+library(mltools)
+library(MVN)
+select <- dplyr::select
+```
+
+### data loading
+
+```{r}
+data <- read_excel("Medical2017.xlsx")
+data <- as.data.frame(data)
+dim(data)
+str(data)
+```
+
+### Check missing value
+
+```{r}
+## 개이득 ㅎㅎㅎ
+colSums(is.na(data))
+```
+
+### 변수 확인
+
+```{r}
+data$Sex <- as.factor(data$Sex)
+data$City <- as.factor(data$City)
+data$Department <- as.factor(data$Department)
+data$Main_sick <- as.factor(data$Main_sick)
+
+data %>%
+  select_if(is.numeric) %>%
+  summary()
+
+data %>%
+  select_if(is.factor) %>%
+  summary()
+```
+
+
+### Total COST 예측이 목적임
+
+```{r}
+## 일단 코스트 다른 코스트 빼고 생각해볼 거임
+data$Patient_cost <- NULL
+data$Insurance_cost <- NULL
+data$Sub_sick <- NULL
+```
+
+### 각 항목별 시각화
+
+```{r}
+## 토탈 비용
+
+data <- data %>%
+  mutate(
+    ageGroup = case_when(
+      data$Age < 20 ~ "child",
+      data$Age >= 20 & data$Age < 40 ~ "lowmiddle",
+      data$Age >= 40 & data$Age < 60 ~ "highmiddle",
+      data$Age >= 60  ~ "older"
+    )
+  )
+
+data$ageGroup <- as.factor(data$ageGroup)
+
+data %>%
+  filter(ageGroup == "child") %>%
+  summary()
+
+data %>%
+  filter(ageGroup == "lowmiddle") %>%
+  summary()
+
+data %>%
+  filter(ageGroup == "highmiddle") %>%
+  summary()
+
+data %>%
+  filter(ageGroup == "older") %>%
+  summary()
+
+
+```
+
+
+### correlation plot
+
+```{r result_correlation, echo=FALSE,fig.align='center', fig.height=4, fig.width=9}
+par(mfrow = c(1,2))
+data %>%
+  filter(ageGroup == "child") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot(method = "color", type="upper", addCoef.col = "black", tl.col = "black")
+
+data %>%
+  filter(ageGroup == "lowmiddle") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot(method = "color", type="upper", addCoef.col = "black", tl.col = "black")
+
+par(mfrow = c(1,2))
+data %>%
+  filter(ageGroup == "highmiddle") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot(method = "color", type="upper", addCoef.col = "black", tl.col = "black")
+
+data %>%
+  filter(ageGroup == "older") %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot(method = "color", type="upper", addCoef.col = "black", tl.col = "black")
+
+```
+
+### 시각화 해보자
+
+```{r visualization, echo=FALSE,fig.align='center', fig.height=7, fig.width=12}
+
+p1 <- data %>%
+  filter(ageGroup == "child") %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Under 20") +
+  theme_bw()
+
+p2 <- data %>%
+  filter(ageGroup == "lowmiddle") %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Low middle Age") +
+  theme_bw()
+
+p3 <- data %>%
+  filter(ageGroup == "highmiddle") %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("High middle Age") +
+  theme_bw()
+
+p4 <- data %>%
+  filter(ageGroup == "older") %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Older Age") +
+  theme_bw()
+
+grid.arrange(p1,p2,p3,p4, nrow = 2,top = textGrob("Department",gp=gpar(fontsize=20,font=3)))
+
+
+p1 <- data %>%
+  filter(ageGroup == "child") %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Under 20") +
+  theme_bw()
+
+p2 <- data %>%
+  filter(ageGroup == "lowmiddle") %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Low middle Age") +
+  theme_bw()
+
+p3 <- data %>%
+  filter(ageGroup == "highmiddle") %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("High middle Age") +
+  theme_bw()
+
+p4 <- data %>%
+  filter(ageGroup == "older") %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Older Age") +
+  theme_bw()
+
+grid.arrange(p1,p2,p3,p4, nrow = 2,top = textGrob("Main_sick",gp=gpar(fontsize=20,font=3)))
+
+p1 <- data %>%
+  filter(ageGroup == "child") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "child")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Under 20") +
+  theme_bw()
+
+p2 <- data %>%
+  filter(ageGroup == "lowmiddle") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "lowmiddle")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Low middle Age") +
+  theme_bw()
+
+p3 <- data %>%
+  filter(ageGroup == "highmiddle") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "highmiddle")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("High middle Age") +
+  theme_bw()
+
+p4 <- data %>%
+  filter(ageGroup == "older") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "older")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Department,Department, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Older Age") +
+  theme_bw()
+
+grid.arrange(p1,p2,p3,p4, nrow = 2,top = textGrob("90% Cost Department",gp=gpar(fontsize=20,font=3)))
+
+p1 <- data %>%
+  filter(ageGroup == "child") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "child")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Under 20") +
+  theme_bw()
+
+p2 <- data %>%
+  filter(ageGroup == "lowmiddle") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "lowmiddle")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Low middle Age") +
+  theme_bw()
+
+p3 <- data %>%
+  filter(ageGroup == "highmiddle") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "highmiddle")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("High middle Age") +
+  theme_bw()
+
+p4 <- data %>%
+  filter(ageGroup == "older") %>%
+  filter(Total_cost > quantile(subset(data, data$ageGroup == "older")$Total_cost, p = c(0.1,0.9))["90%"]) %>%
+  ggplot(aes(x = reorder(Main_sick,Main_sick, function(x) -length(x)))) +
+  geom_bar() + xlab("") + 
+  ggtitle("Older Age") +
+  theme_bw()
+
+grid.arrange(p1,p2,p3,p4, nrow = 2,top = textGrob("90% Cost Main_sick",gp=gpar(fontsize=20,font=3)))
+
+
+## 백만원 이상임 널싱 Hospitalization
+p1 <- data %>%
+  filter(ageGroup == "child" & Total_cost > 1000000) %>%
+  ggplot(aes(Nursing_days, Hospitalization)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Under 20") +
+  theme_bw()
+
+p2 <- data %>%
+  filter(ageGroup == "lowmiddle" & Total_cost > 1000000) %>%
+  ggplot(aes(Nursing_days, Hospitalization)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Low middle Age") +
+  theme_bw()
+
+p3 <- data %>%
+  filter(ageGroup == "highmiddle" & Total_cost > 1000000) %>%
+  ggplot(aes(Nursing_days, Hospitalization)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("High middle Age") +
+  theme_bw()
+
+p4 <- data %>%
+  filter(ageGroup == "older" & Total_cost > 1000000) %>%
+  ggplot(aes(Nursing_days, Hospitalization)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Older Age") +
+  theme_bw()
+
+grid.arrange(p1,p2,p3,p4, nrow = 2,top = textGrob("Nursing - Hospitalization",gp=gpar(fontsize=20,font=3)))
+
+p1 <- data %>%
+  ggplot(aes(Nursing_days, Total_cost, color = ageGroup)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Nursing - Total") +
+  theme_bw()
+
+p2 <- data %>%
+  ggplot(aes(Hospitalization, Total_cost, color = ageGroup)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Hospitalization - Total") +
+  theme_bw()
+
+grid.arrange(p1,p2, nrow = 1)
+```
+
+### Outlier 제거 마하라노비스를 통해서 
+
+```{r}
+## mahalanobis(데이터셋, mean, cov)
+## nurse, hospitalization, total cost 세 개 이용할 거임
+
+
+maha_data <- data %>%
+  select(Nursing_days, Hospitalization, Total_cost)
+
+maha <- mahalanobis(maha_data, colMeans(maha_data), cov(maha_data, use = "pairwise.complete.obs"))
+cutoff <- qchisq(.999, ncol(maha_data))
+noout <- data[maha < cutoff, ]
+dim(noout)
+
+noout %>%
+  select_if(is.numeric) %>%
+  select(-Age, -Prescription) %>%
+  cor()
+```
+
+```{r , echo=FALSE,fig.align='center', fig.height=6, fig.width=12}
+
+p1 <- noout %>%
+  ggplot(aes(Nursing_days, Total_cost, color = ageGroup)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Nursing - Total") +
+  theme_bw()
+
+p2 <- noout %>%
+  ggplot(aes(Hospitalization, Total_cost, color = ageGroup)) +
+  geom_point() +
+  geom_smooth(method = "lm")+ xlab("") + 
+  ggtitle("Hospitalization - Total") +
+  theme_bw()
+
+grid.arrange(p1,p2, nrow = 1)
+```
+
+
+```{r}
+all.fit <- lm(Total_cost ~., data= noout)
+step.fit <- stepAIC(all.fit, direction = "both", trace = FALSE)
+summary(step.fit)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
