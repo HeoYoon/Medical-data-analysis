@@ -106,6 +106,12 @@ data %>%
 ### correlation plot
 
 ```{r result_correlation, echo=FALSE,fig.align='center', fig.height=4, fig.width=9}
+data %>%
+  select_if(is.numeric) %>%
+  cor() %>%
+  corrplot(method = "color", type="upper", addCoef.col = "black", tl.col = "black")
+
+
 par(mfrow = c(1,2))
 data %>%
   filter(ageGroup == "child") %>%
@@ -326,9 +332,11 @@ grid.arrange(p1,p2, nrow = 1)
 ## mahalanobis(데이터셋, mean, cov)
 ## nurse, hospitalization, total cost 세 개 이용할 거임
 
-
 maha_data <- data %>%
-  select(Nursing_days, Hospitalization, Total_cost)
+  select_if(is.numeric)
+
+# maha_data <- data %>%
+#   select(Nursing_days, Hospitalization, Total_cost)
 
 maha <- mahalanobis(maha_data, colMeans(maha_data), cov(maha_data, use = "pairwise.complete.obs"))
 cutoff <- qchisq(.999, ncol(maha_data))
